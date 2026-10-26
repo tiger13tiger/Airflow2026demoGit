@@ -4,6 +4,9 @@ A small, from-scratch Apache Airflow project for learning: what Airflow is,
 how it's configured, and how to run/test it both locally and in GitHub
 Actions.
 
+Contributing changes? See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+branch/PR workflow this repo uses.
+
 ## Core concepts (the vocabulary you need)
 
 - **DAG** (Directed Acyclic Graph): a Python file under `dags/` that
