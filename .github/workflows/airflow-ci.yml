@@ -1,0 +1,56 @@
+name: Airflow CI
+
+# Runs on every push/PR so a broken DAG is caught before anyone merges it.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+env:
+  AIRFLOW_VERSION: "2.10.4"
+  PYTHON_VERSION: "3.11"
+  # Keep Airflow's own home inside the runner's workspace so nothing
+  # leaks between jobs and there's nothing to clean up afterwards.
+  AIRFLOW_HOME: ${{ github.workspace }}/airflow_home
+  # Point Airflow straight at this repo's dags/ folder instead of the
+  # default ~/airflow/dags.
+  AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/dags
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  # SequentialExecutor + SQLite is the lightest possible setup - perfect
+  # for CI, not something you'd use in production.
+  AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+
+jobs:
+  validate-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Airflow (with upstream constraints) and test deps
+        run: |
+          CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+          pip install --upgrade pip
+          pip install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+          pip install pytest==8.3.3
+
+      - name: Initialize the Airflow metadata database
+        run: airflow db migrate
+
+      - name: Check every DAG parses with no import errors
+        run: airflow dags list-import-errors
+
+      - name: Run DAG integrity tests
+        run: pytest tests/ -v
+
+      - name: Execute the etl_pipeline DAG for real
+        # `airflow dags test` runs every task in one real DagRun, outside
+        # the scheduler, and prints their logs - this is what actually
+        # proves extract -> transform -> load works end-to-end, XComs
+        # included. (`airflow tasks test` runs each task in its own
+        # throwaway run, so XCom hand-offs between tasks wouldn't work.)
+        run: airflow dags test etl_pipeline 2024-01-01

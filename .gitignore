@@ -1,0 +1,19 @@
+# Airflow runtime artifacts
+airflow_home/
+airflow.db
+airflow.cfg
+logs/
+standalone_admin_password.txt
+*.pid
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Docker / env
+.env
+
+# OS
+.DS_Store
